@@ -7,7 +7,7 @@ export Projection, # proj_types.jl
        is_latlong, is_geocent, compare_datums, spheroid_params,
        xy2lonlat, xy2lonlat!, lonlat2xy, lonlat2xy!
 
-include("projection_codes.jl") # ESRI and EPSG projection strings
+include("proj_data.jl") # Data and utilities for looking up projections
 include("proj_capi.jl") # low-level C-facing functions (corresponding to src/proj_api.h)
 
 function _version()

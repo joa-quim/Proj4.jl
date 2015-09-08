@@ -1,6 +1,7 @@
 const FILENAMES = ("epsg",
                    "esri")
 
+parse_comment(line::String) = match(r"^# *(.+)", line)
 parse_projection(line::String) = match(r"<(\d+)>\s+(.*?)\s+<>", line)
 
 println("# Contents of this file is generated on $(now()). Do not edit by hand!")
@@ -22,7 +23,8 @@ for filename in FILENAMES
             continue
         else
             proj_code, proj_string = m.captures
-            @printf("  %s => \"%s\", %s", proj_code, proj_string, lines[i-1])
+            comment = parse_comment(lines[i-1])[1]
+            @printf("  %s => (\"%s\", \"%s\"),\n", proj_code, proj_string, comment)
         end
     end
     println(")\n")

@@ -1,3 +1,4 @@
+# Projection functions
 @doc "Return true if the projection is a geographic coordinate system" ->
 is_latlong(proj::Projection) = _is_latlong(proj.rep)
 
@@ -114,6 +115,9 @@ transform(src::Projection, dest::Projection, position::Vector{Float64}, radians:
 # """ ->
 # latlong_projection(proj::Projection) = Projection(_latlong_from_proj(proj.rep))
 
+
+#-------------------------------------------------------------------------------
+# Geodesic functions
 if has_geodesic_support
 
     function _geod(proj::Projection)
