@@ -1,45 +1,87 @@
-## Types
-
-# Projection context.  TODO: Will this be exposed?
-#type Context
-#    rep::Ptr{Void} # Pointer to internal projCtx struct
-#end
-
-"""
-Cartographic projection type
-"""
-type Projection
-    #ctx::Context   # Projection context object
-    rep::Ptr{Void} # Pointer to internal projPJ struct
-    
-    # [geod]: a structure containing the parameters of the spheroid
-    # some of the fields in [geod] are mildly duplicative of the information
-    # available in [rep], which can be exposed only through _get_spheroid_defn
-    geod::_geodesic
+#=
+immutable SRID
+    auth::Symbol
+    id::Int
 end
 
-function Projection(proj_ptr::Ptr{Void})
-    proj = Projection(proj_ptr, null_geodesic())
-    finalizer(proj, freeProjection)
-    proj
+SRID() = SRID(:UNDEF, -1)
+=#
+
+
+type ProjCRS
+    ptr::Ptr{Void} # Pointer to internal projPJ struct
+
+    function ProjCRS(proj_ptr::Ptr{Void})
+        crs = new(proj_ptr)
+        finalizer(crs, c->(pj_free(c.ptr); c.ptr = C_NULL))
+        crs
+    end
 end
 
+
 """
-Construct a projection from a string in proj.4 "plus format"
+    ProjCRS(proj_string)
 
-The projection string `proj_string` is defined in the proj.4 format,
-with each part of the projection specification prefixed with '+' character.
-For example:
+Construct a Coordinate Reference System from a string given in proj.4
+"plus format".
 
-    `wgs84 = Projection("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")`
+The proj.4 string format is a space separated list of key-value pairs and
+options, each prefixed with a `+`.  For example:
+
+    wgs84 = ProjCRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")
+
+Here's a big ugly list of all the options used in the proj.4 strings
+distributed with the C library.  Some information about these can be found at
+https://trac.osgeo.org/proj/wiki/FAQ.
+
++a +alpha +axis +b +datum +ellps +gamma +geoidgrids +k +k_0
++lat_0 +lat_1 +lat_2 +lat_ts +lon_0 +lonc +nadgrids +no_defs +no_uoff
++pm +proj +R_A +rf +south +title +to_meter +towgs84 +units +vunits
++wktext +x_0 +y_0 +zone
 """
-Projection(proj_string::ASCIIString) = Projection(_init_plus(proj_string))
+ProjCRS(proj_string::AbstractString) = ProjCRS(pj_init_plus(proj_string))
 
-function freeProjection(proj::Projection)
-    _free(proj.rep)
-    proj.rep = C_NULL
-end
 
 # Pretty printing
-Base.print(io::IO, proj::Projection) = print(io, strip(_get_def(proj.rep)))
-Base.show(io::IO, proj::Projection) = print(io, "Projection(\"$proj\")")
+Base.print(io::IO, crs::ProjCRS) = print(io, strip(pj_get_def(crs.ptr)))
+Base.show(io::IO, crs::ProjCRS) = print(io, "ProjCRS(\"$crs\")")
+
+
+#-------------------------------------------------------------------------------
+# Information about Coordinate Reference Systems
+
+"""
+Return true if the coordinate system is latitude-longitude.
+"""
+is_latlong(crs::ProjCRS) = _is_latlong(crs.ptr)
+
+
+"""
+Return true if the coordinate system is Cartesian geocentric.
+"""
+is_geocent(crs::ProjCRS) = pj_is_geocent(crs.ptr)
+
+
+"""
+Return true if the datums for the two projections are the same.
+
+proj.4 identifies datums by the way they transform to a central CRS, which is a
+combination of the +towgs84 option (for geocentric datum shift parameters) and
+the +nadgrids option (for an arbitrary gridded transformation).
+
+considers two datums to be the same if they have the same set of
+transformation parameters 
+"""
+compare_datums(p1::ProjCRS, p2::ProjCRS) = pj_compare_datums(p1.ptr, p2.ptr)
+
+
+"""
+Return the definition of the ellipsoid as a tuple
+"""
+function ellipsoid(crs::ProjCRS)
+    a, e2 = pj_get_spheroid_defn(crs.ptr)
+    f = 1 - sqrt(1 - e2)
+    b = a * (1 - f)
+    Ellipsoid(a, b, f, e2, :UNKNOWN)
+end
+
