@@ -44,8 +44,8 @@ function pj_free(proj_ptr)
 end
 
 """
-Return the lat/lon coordinate system on which a projection is based.
-If the coordinate system passed in is latlong, a clone of the same will be returned.
+Return the lat/lon coordinate system on which a crs is based.  If the
+coordinate system passed in is latlong, a clone of the same will be returned.
 """
 function pj_latlong_from_proj(proj_ptr)
     ccall((:pj_latlong_from_proj, libproj), Ptr{Void}, (Ptr{Void},), proj_ptr)
@@ -98,7 +98,7 @@ Low level interface to pj_transform, which transforms between two coordinate
 systems. C_NULL can be passed in for z to ignore the height component.
 """
 function pj_transform!(src_ptr, dest_ptr, point_count, point_stride,
-                     x::Ptr{Cdouble}, y::Ptr{Cdouble}, z::Ptr{Cdouble})
+                       x::Ptr{Cdouble}, y::Ptr{Cdouble}, z::Ptr{Cdouble})
     @assert src_ptr != C_NULL && dest_ptr != C_NULL
     err = ccall((:pj_transform, libproj), Cint, (Ptr{Void}, Ptr{Void}, Clong, Cint, Ptr{Cdouble}, Ptr{Cdouble},
                 Ptr{Cdouble}), src_ptr, dest_ptr, point_count, point_stride, x, y, z)
@@ -133,7 +133,9 @@ end
 
 
 #-------------------------------------------------------------------------------
-# Obsolete(?) 2D pointwise transformation interface
+# Semi-obsolete(?) 2D pointwise transformation interface
+#
+# See the README for more discussion
 
 immutable ProjUV
     u::Cdouble
