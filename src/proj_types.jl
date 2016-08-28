@@ -47,6 +47,16 @@ Base.print(io::IO, crs::ProjCRS) = print(io, strip(pj_get_def(crs.ptr)))
 Base.show(io::IO, crs::ProjCRS) = print(io, "ProjCRS(\"$crs\")")
 
 
+"""
+    latlon_crs(crs::ProjCRS)
+
+Return the latitude-longitude coordinate reference system on which `crs` is
+based.  If the coordinate system passed in is latlong, a clone of the same will
+be returned.
+"""
+latlong_crs(crs::ProjCRS) = ProjCRS(pj_latlong_from_proj(crs.ptr))
+
+
 #-------------------------------------------------------------------------------
 # Information about Coordinate Reference Systems
 

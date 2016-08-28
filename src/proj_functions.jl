@@ -1,61 +1,12 @@
 #-------------------------------------------------------------------------------
-"""
-Returns the forward projection from LatLon to XY in the given projection,
-modifying the input lonlat inplace (only supports 2 dimensions)"""
-function lonlat2xy!(lonlat::Vector{Float64}, proj::Projection, radians::Bool=false)
-    !radians && (lonlat[:] = deg2rad(lonlat))
-    _fwd!(lonlat, proj.rep)
-end
-
-function lonlat2xy!(lonlat::Array{Float64,2}, proj::Projection, radians::Bool=false)
-    if !radians
-        for i in eachindex(lonlat)
-            lonlat[i] = deg2rad(lonlat[i])
-        end
-    end
-    _fwd!(lonlat, proj.rep)
-end
-
-"Returns the forward projection from LonLat to XY in the given projection (only supports 2 dimensions)"
-lonlat2xy(lonlat::Vector{Float64}, proj::Projection, radians::Bool=false) =
-    lonlat2xy!(copy(lonlat), proj, radians)
-lonlat2xy(lonlat::Array{Float64,2}, proj::Projection, radians::Bool=false) =
-    lonlat2xy!(copy(lonlat), proj, radians)
 
 """
-Returns the inverse projection from XY to LonLat in the given projection,
-modifying the input xy inplace (only supports 2 dimensions)"""
-function xy2lonlat!(xy::Vector{Float64}, proj::Projection, radians::Bool=false)
-    _inv!(xy, proj.rep)
-    !radians && (xy[1:2] = rad2deg(xy[1:2]))
-    xy
-end
+    transform!(src_crs, dest_crs, position [, radians=false])
 
-function xy2lonlat!(xy::Array{Float64,2}, proj::Projection, radians::Bool=false)
-    _inv!(xy, proj.rep)
-    if !radians
-        for i in eachindex(xy)
-            xy[i] = rad2deg(xy[i])
-        end
-    end
-    xy
-end
+Transform between coordinate reference systems, modifying `position` in place.
 
-"Returns the inverse projection from XY to LatLon in the given projection (only supports 2 dimensions)"
-xy2lonlat(xy::Vector{Float64}, proj::Projection, radians::Bool=false) = xy2lonlat!(copy(xy), proj, radians)
-xy2lonlat(xy::Array{Float64,2}, proj::Projection, radians::Bool=false) = xy2lonlat!(copy(xy), proj, radians)
-
-
-"""
-    transform!(src_projection, dest_projection, position [, radians=false])
-
-Transform between geographic or projected coordinate systems, modifying
-`position` in place.
-
-Args:
-
-    src      - Source coordinate system definition
-    dest     - Destination coordinate system definition
+    src_crs  - Source coordinate system definition
+    dest_crs - Destination coordinate system definition
     position - An array of coordinates to be transformed in place.  If `position` is a
                Vector of length 2 or 3 it's treated as a single point.  For
                geographic coordinate systems, the first two columns are the
@@ -68,7 +19,7 @@ Returns:
 
     position - Transformed position
 """
-function transform!(src::Projection, dest::Projection, position::Array{Float64,2}, radians::Bool=false)
+function transform!(src::ProjCRS, dest::ProjCRS, position::Array{Float64,2}, radians::Bool=false)
     npoints, ndim = size(position)
     @assert ndim >= 2
     if !radians && is_latlong(src)
@@ -76,7 +27,7 @@ function transform!(src::Projection, dest::Projection, position::Array{Float64,2
             position[i,1] = deg2rad(position[i,1]); position[i,2] = deg2rad(position[i,2])
         end
     end
-    _transform!(src.rep, dest.rep, position)
+    pj_transform!(src.ptr, dest.ptr, position)
     if !radians && is_latlong(dest)
         for i=1:npoints
             position[i,1] = rad2deg(position[i,1]); position[i,2] = rad2deg(position[i,2])
@@ -86,42 +37,92 @@ function transform!(src::Projection, dest::Projection, position::Array{Float64,2
 end
 
 """
-    transform(src_projection, dest_projection, position [, radians=false])
+    transform(src_csr, dest_csr, position [, radians=false])
 
-Transform between geographic or projected coordinate systems, returning the
-transformed points in a Float64 array the same shape as `position`.
+Transform between coordinate reference systems, returning the transformed
+points in a Float64 array the same shape as `position`.
 """
-transform(src::Projection, dest::Projection, position::Array{Float64,2}, radians::Bool=false) =
+transform(src::ProjCRS, dest::ProjCRS, position::Array{Float64,2}, radians::Bool=false) =
     transform!(src, dest, copy(position), radians)
-transform{T<:Real}(src::Projection, dest::Projection, position::Array{T,2}, radians::Bool=false) =
+transform{T<:Real}(src::ProjCRS, dest::ProjCRS, position::Array{T,2}, radians::Bool=false) =
     transform!(src, dest, map(Float64, position), radians)
 
 
-function transform!(src::Projection, dest::Projection, position::Vector{Float64}, radians::Bool=false)
+function transform!(src::ProjCRS, dest::ProjCRS, position::Vector{Float64}, radians::Bool=false)
     !radians && is_latlong(src) && (position[1] = deg2rad(position[1]); position[2] = deg2rad(position[2]))
-    _transform!(src.rep, dest.rep, position)
+    pj_transform!(src.ptr, dest.ptr, position)
     !radians && is_latlong(dest) && (position[1] = rad2deg(position[1]); position[2] = rad2deg(position[2]))
     position
 end
-transform(src::Projection, dest::Projection, position::Vector{Float64}, radians::Bool=false) =
+transform(src::ProjCRS, dest::ProjCRS, position::Vector{Float64}, radians::Bool=false) =
     transform!(src, dest, copy(position), radians)
-transform{T<:Real}(src::Projection, dest::Projection, position::Vector{T}, radians::Bool=false) =
+transform{T<:Real}(src::ProjCRS, dest::ProjCRS, position::Vector{T}, radians::Bool=false) =
     transform!(src, dest, map(Float64, position), radians)
 
 
-# Unused/untested
-# """
-# Return the lat/long coordinate system on which a projection is based.
-# If the coordinate system passed in is latlong, a clone of the same will be returned.
-# """
-# latlong_projection(proj::Projection) = Projection(_latlong_from_proj(proj.rep))
+#-------------------------------------------------------------------------------
+# 2D projections
+#
+# FIXME: These should not really act on ProjCRS objects, as this is quite
+# conceptually confusing!  See the README.
+#=
+"""
+Returns the forward projection from LatLon to XY in the given projection,
+modifying the input lonlat inplace (only supports 2 dimensions)"""
+function lonlat2xy!(lonlat::Vector{Float64}, proj::ProjCRS, radians::Bool=false)
+    !radians && (lonlat[:] = deg2rad(lonlat))
+    pj_fwd!(lonlat, proj.ptr)
+end
 
+function lonlat2xy!(lonlat::Array{Float64,2}, proj::ProjCRS, radians::Bool=false)
+    if !radians
+        for i in eachindex(lonlat)
+            lonlat[i] = deg2rad(lonlat[i])
+        end
+    end
+    pj_fwd!(lonlat, proj.ptr)
+end
+
+"Returns the forward projection from LonLat to XY in the given projection (only supports 2 dimensions)"
+lonlat2xy(lonlat::Vector{Float64}, proj::ProjCRS, radians::Bool=false) =
+    lonlat2xy!(copy(lonlat), proj, radians)
+lonlat2xy(lonlat::Array{Float64,2}, proj::ProjCRS, radians::Bool=false) =
+    lonlat2xy!(copy(lonlat), proj, radians)
+
+"""
+Returns the inverse projection from XY to LonLat in the given projection,
+modifying the input xy inplace (only supports 2 dimensions)"""
+function xy2lonlat!(xy::Vector{Float64}, proj::ProjCRS, radians::Bool=false)
+    pj_inv!(xy, proj.ptr)
+    !radians && (xy[1:2] = rad2deg(xy[1:2]))
+    xy
+end
+
+function xy2lonlat!(xy::Array{Float64,2}, proj::ProjCRS, radians::Bool=false)
+    pj_inv!(xy, proj.ptr)
+    if !radians
+        for i in eachindex(xy)
+            xy[i] = rad2deg(xy[i])
+        end
+    end
+    xy
+end
+
+"Returns the inverse projection from XY to LatLon in the given projection (only supports 2 dimensions)"
+xy2lonlat(xy::Vector{Float64}, proj::ProjCRS, radians::Bool=false) = xy2lonlat!(copy(xy), proj, radians)
+xy2lonlat(xy::Array{Float64,2}, proj::ProjCRS, radians::Bool=false) = xy2lonlat!(copy(xy), proj, radians)
+
+
+#-------------------------------------------------------------------------------
+# Geodesic problems on the spheroid.
+# FIXME: These should be constructed from an Ellipsoid; interaction with
+# ProjCRS should be minimized at this stage.
 
 if has_geodesic_support
 
-    function _geod(proj::Projection)
+    function _geod(proj::ProjCRS)
         if isa(proj.geod, null_geodesic)
-            a, es = _get_spheroid_defn(proj.rep)
+            a, es = _get_spheroid_defn(proj.ptr)
             proj.geod = geod_geodesic(a, 1-sqrt(1-es))
         end
         proj.geod
@@ -136,13 +137,13 @@ if has_geodesic_support
         azimuth  - azimuth (degrees) ∈ [-540, 540)
         distance - distance (metres) to move from (lat,lon); can be negative
         proj     - the given projection whose ellipsoid we move along
-       
+
     Returns:
 
         dest     - destination after moving for [distance] metres in [azimuth] direction.
         azi      - forward azimuth (degrees) at destination [dest].
     """
-    function geod_direct!(position::Vector{Float64}, azimuth::Float64, distance::Float64, proj::Projection)
+    function geod_direct!(position::Vector{Float64}, azimuth::Float64, distance::Float64, proj::ProjCRS)
         xy2lonlat!(position, proj)
         dest, azi = _geod_direct!(_geod(proj), position, azimuth, distance)
         lonlat2xy!(dest, proj), azi
@@ -157,19 +158,19 @@ if has_geodesic_support
         azimuth  - azimuth (degrees) ∈ [-540, 540)
         distance - distance (metres) to move from (lat,lon); can be negative
         proj     - the given projection whose ellipsoid we move along
-       
+
     Returns:
 
         dest     - destination after moving for [distance] metres in [azimuth] direction.
         azi      - forward azimuth (degrees) at destination [dest].
 
     """
-    geod_direct(position::Vector{Float64}, azimuth::Float64, distance::Float64, proj::Projection) = 
+    geod_direct(position::Vector{Float64}, azimuth::Float64, distance::Float64, proj::ProjCRS) =
         geod_direct!(copy(position), azimuth, distance, proj)
 
     "Returns the destination by moving along the ellipsoid in the given projection"
-    geod_destination!(position::Vector{Float64}, azi::Float64, dist::Float64, proj::Projection) = geod_direct!(position, azi, dist, proj)[1]
-    geod_destination(position::Vector{Float64}, azi::Float64, dist::Float64, proj::Projection) = geod_destination!(copy(position), azi, dist, proj)
+    geod_destination!(position::Vector{Float64}, azi::Float64, dist::Float64, proj::ProjCRS) = geod_direct!(position, azi, dist, proj)[1]
+    geod_destination(position::Vector{Float64}, azi::Float64, dist::Float64, proj::ProjCRS) = geod_destination!(copy(position), azi, dist, proj)
 
     """
     Solve the inverse geodesic problem.
@@ -191,10 +192,12 @@ if has_geodesic_support
         If either point is at a pole, the azimuth is defined by keeping the longitude fixed,
         writing lat = 90 +/- eps, and taking the limit as eps -> 0+.
     """
-    geod_inverse(xy1::Vector{Float64}, xy2::Vector{Float64}, proj::Projection) =
+    geod_inverse(xy1::Vector{Float64}, xy2::Vector{Float64}, proj::ProjCRS) =
         _geod_inverse(_geod(proj), xy2lonlat(xy1, proj), xy2lonlat(xy2, proj))
 
     "Returns the distance between the two points in the given projection"
-    geod_distance(p1::Vector{Float64}, p2::Vector{Float64}, proj::Projection) = geod_inverse(p1, p2, proj)[1]
+    geod_distance(p1::Vector{Float64}, p2::Vector{Float64}, proj::ProjCRS) = geod_inverse(p1, p2, proj)[1]
 
 end
+
+=#

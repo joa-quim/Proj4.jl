@@ -33,16 +33,12 @@ end
 "Parsed version number for the underlying version of libproj"
 const version = _version()
 
+@assert version >= v"4.9.0" "proj.4 C library version of at least 4.9.0 is required"
 
 
-#=
-if has_geodesic_support
-    export geod_direct, geod_inverse, geod_destination, geod_distance
-    include("proj_geodesic.jl") # low-level C-facing functions (corresponding to src/geodesic.h)
-end
-=#
+#export geod_direct, geod_inverse, geod_destination, geod_distance
+#include("proj_geodesic.jl") # low-level C-facing functions (corresponding to src/geodesic.h)
 
-#include("proj_types.jl") # type definitions for proj objects
 #include("proj_functions.jl") # user-facing proj functions
 
 end # module
