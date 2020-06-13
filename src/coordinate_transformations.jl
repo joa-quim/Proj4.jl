@@ -27,10 +27,7 @@ mutable struct CRS2CRS <: CoordinateTransformations.Transformation
     direction::PJ_DIRECTION
 end
 
-function CRS2CRS(source::String, target::String, direction::PJ_DIRECTION = PJ_FWD; area = C_NULL, normalize = true)
-
-    pj_init = proj_create_crs_to_crs(source, target, area)
-
+function _crs2crs(pj_init::Ptr{Cvoid}, direction::PJ_DIRECTION = PJ_FWD; area = C_NULL, normalize = true)
     obj = if normalize
         pj_normalized = proj_normalize_for_visualization(pj_init)
         proj_destroy(pj_init)
@@ -46,14 +43,14 @@ function CRS2CRS(source::String, target::String, direction::PJ_DIRECTION = PJ_FW
     return obj
 end
 
+function CRS2CRS(source::AbstractString, target::AbstractString, direction::PJ_DIRECTION = PJ_FWD; area = C_NULL, normalize = true)
+    pj_init = proj_create_crs_to_crs(source, target, area)
+    return _crs2crs(pj_init, direction; area, normalize)
+end
+
 function CRS2CRS(source::Projection, target::Projection, direction::PJ_DIRECTION = PJ_FWD; area = C_NULL, normalize = true)
-    return CRS2CRS(
-        sprint(print, source),
-        sprint(print, target),
-        direction;
-        area = area,
-        normalize = true
-    )
+    pj_init = proj_create_crs_to_crs_from_pj(source.rep, target.rep, area)
+    return _crs2crs(pj_init, direction; area, normalize)
 end
 
 function Base.inv(dir::PJ_DIRECTION)

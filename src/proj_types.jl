@@ -19,6 +19,12 @@ mutable struct Projection
 end
 
 function Projection(proj_ptr::Ptr{Cvoid})
+    # proj_create can create both transformation and CRS objects
+    # only accept the latter such that it can be used with the functions from
+    # https://proj.org/development/reference/functions.html#c-api-for-iso-19111-functionality
+    if proj_is_crs(proj_ptr) != 1
+        throw(ArgumentError("Projection only accepts CRS objects, not transformations"))
+    end
     proj = Projection(proj_ptr, null_geodesic())
     finalizer(freeProjection, proj)
     proj
@@ -33,7 +39,7 @@ For example:
 
     `wgs84 = Projection("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")`
 """
-Projection(proj_string::String) = Projection(_init_plus(proj_string))
+Projection(def::String, ctx = C_NULL) = Projection(proj_create(def, ctx))
 
 function freeProjection(proj::Projection)
     _free(proj.rep)
@@ -41,5 +47,5 @@ function freeProjection(proj::Projection)
 end
 
 # Pretty printing
-Base.print(io::IO, proj::Projection) = print(io, strip(_get_def(proj.rep)))
-Base.show(io::IO, proj::Projection) = print(io, "Projection(\"$proj\")")
+Base.print(io::IO, proj::Projection) = print(io, proj_get_name(proj.rep))
+Base.show(io::IO, proj::Projection) = print(io, "Projection: \"$proj\"")
