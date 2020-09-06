@@ -1,7 +1,23 @@
 module Proj4
 
-using PROJ_jll
 using CEnum
+
+const gtlib = Ref{String}()
+try
+	gmtlib[] = haskey(ENV,"GMT_LIBRARY") ?
+		ENV["GMT_LIBRARY"] : string(chop(read(`gmt --show-library`, String)))
+catch
+    error("This package can only be installed in systems that have GMT")
+end
+@static Sys.iswindows() ?
+	(Sys.WORD_SIZE == 64 ? (const libproj = "proj_w64") : (const libproj = "proj_w32")) : 
+	(
+		Sys.isapple() ? libproj = split(readlines(pipeline(`otool -L $gmtlib`, `grep libproj`))[1])[1] :
+		(
+		    Sys.isunix() ? libproj = split(readlines(pipeline(`ldd $gmtlib`, `grep libproj`))[1])[3] :
+			error("Don't know how to install this package in this OS.")
+		)
+	)
 
 export Projection, # proj_types.jl
        transform, transform!,  # proj_functions.jl
