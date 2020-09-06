@@ -2,6 +2,7 @@ module Proj4
 
 using CEnum
 
+# Fish the binary dependency via GMT lib (except on Windows where we know it in advance)
 const gmtlib = Ref{String}()
 try
 	gmtlib[] = haskey(ENV,"GMT_LIBRARY") ?
