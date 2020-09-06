@@ -2,7 +2,7 @@ module Proj4
 
 using CEnum
 
-const gtlib = Ref{String}()
+const gmtlib = Ref{String}()
 try
 	gmtlib[] = haskey(ENV,"GMT_LIBRARY") ?
 		ENV["GMT_LIBRARY"] : string(chop(read(`gmt --show-library`, String)))
@@ -78,8 +78,8 @@ function __init__()
     proj_log_func(C_NULL, funcptr)
 
     # point to the location of the provided shared resources
-    PROJ_LIB[] = joinpath(PROJ_jll.artifact_dir, "share", "proj")
-    proj_context_set_search_paths(1, [PROJ_LIB[]])
+    #PROJ_LIB[] = joinpath(PROJ_jll.artifact_dir, "share", "proj")
+    #proj_context_set_search_paths(1, [PROJ_LIB[]])
 end
 
 end # module
