@@ -13,9 +13,9 @@ end
 @static Sys.iswindows() ?
 	(Sys.WORD_SIZE == 64 ? (const libproj = "proj_w64") : (const libproj = "proj_w32")) : 
 	(
-		Sys.isapple() ? libproj = split(readlines(pipeline(`otool -L $gmtlib`, `grep libproj`))[1])[1] :
+		Sys.isapple() ? (const libproj = Symbol(split(readlines(pipeline(`otool -L $gmtlib`, `grep libproj`))[1])[1])) :
 		(
-		    Sys.isunix() ? libproj = split(readlines(pipeline(`ldd $gmtlib`, `grep libproj`))[1])[3] :
+		    Sys.isunix() ? (const libproj = Symbol(split(readlines(pipeline(`ldd $gmtlib`, `grep libproj`))[1])[3])) :
 			error("Don't know how to install this package in this OS.")
 		)
 	)
