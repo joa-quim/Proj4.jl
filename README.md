@@ -5,6 +5,30 @@
 
 A simple Julia wrapper around the [PROJ](https://proj.org/) cartographic projections library.
 
+# WARNING
+
+This version relies on having [GMT](https://github.com/GenericMappingTools/GMT.jl) installed and will use it to find the system libraries
+needed for this package. This has the advantage of and saving you disk space. However, being a fork it may risk to go out of sync with time.
+
+It would be nice if this solution could be integrated in the officially registered package as an install option but atm I don't know
+how to implement that.
+
+See also same solution for:
+
+- [GDAL](https://github.com/joa-quim/GDAL.jl)
+- [LibGEOS](https://github.com/joa-quim/LibGEOS.jl)
+- [NetCDF](https://github.com/joa-quim/NetCDF.jl)
+
+## Installation
+
+```
+pkg> add https://github.com/joa-quim/Proj4.jl
+```
+To test if it is installed correctly, use:
+```
+pkg> test Proj4
+```
+
 Basic example:
 
 ```julia
